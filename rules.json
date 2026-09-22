@@ -1,30 +1,22 @@
 {
-  "enabled": true,
-  "debug": false,
-  "placeholder_prefix": "__VG_",
-  "session": {
-    "ttl": "1h",
-    "max_mappings": 100000
-  },
+  "version": 1,
+  "updated": "2026-09-23",
+  "source": "https://github.com/link-seek/opencode-vibeguard/blob/main/rules.json",
   "patterns": {
-    "keywords": [
-      { "value": "my-api-key-123", "category": "API_KEY" }
-    ],
+    "keywords": [],
     "regex": [
       { "pattern": "sk-[A-Za-z0-9]{48}", "category": "OPENAI_KEY" },
       { "pattern": "(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]+", "category": "GITHUB_TOKEN" },
       { "pattern": "AKIA[0-9A-Z]{16}", "category": "AWS_ACCESS_KEY" },
       { "pattern": "\\bcfut_[A-Za-z0-9_-]{30,}\\b", "category": "CLOUDFLARE_USER_TOKEN" },
       { "pattern": "\\bcfat_[A-Za-z0-9_-]{30,}\\b", "category": "CLOUDFLARE_ACCOUNT_TOKEN" },
-      { "pattern": "\\bcfk_[A-Za-z0-9_-]{30,}\\b", "category": "CLOUDFLARE_GLOBAL_KEY" }
+      { "pattern": "\\bcfk_[A-Za-z0-9_-]{30,}\\b", "category": "CLOUDFLARE_GLOBAL_KEY" },
+      { "pattern": "xox[baprs]-[A-Za-z0-9-]+", "category": "SLACK_TOKEN" },
+      { "pattern": "sk_live_[A-Za-z0-9]+", "category": "STRIPE_LIVE_KEY" },
+      { "pattern": "hf_[A-Za-z0-9]+", "category": "HUGGINGFACE_TOKEN" },
+      { "pattern": "npm_[A-Za-z0-9]+", "category": "NPM_TOKEN" }
     ],
     "builtin": ["email", "china_phone", "china_id", "uuid", "ipv4", "mac"],
     "exclude": ["example.com", "localhost", "127.0.0.1", "0.0.0.0"]
-  },
-  "subscription": {
-    "enabled": true,
-    "url": "https://raw.githubusercontent.com/link-seek/opencode-vibeguard/main/rules.json",
-    "refresh": "24h",
-    "timeoutMs": 8000
   }
 }

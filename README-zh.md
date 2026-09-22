@@ -95,6 +95,24 @@ V2 钩子映射：`prompt`（入库前脱敏，DB 存占位符）+ `context`/`co
 
 注意：V2 没有 `text.complete` 还原，持久化历史保持占位符（更安全）。本地展示为占位符，不影响工具执行。
 
+## 规则订阅（V2）
+
+本地 `patterns` 永远生效。在此之上插件会拉取远端规则集并合并（冲突时本地优先），定时刷新——全程 fail-closed（拉取失败沿用现有规则）。
+
+```jsonc
+// vibeguard.config.json
+{
+  "subscription": {
+    "enabled": true,
+    "url": "https://raw.githubusercontent.com/link-seek/opencode-vibeguard/main/rules.json",
+    "refresh": "24h",
+    "timeoutMs": 8000
+  }
+}
+```
+
+规则源就是本仓库的 `rules.json`。拉到的文档会校验（结构、最多 1000 条/256KB、每条正则必须可编译），并缓存在插件 storage 里，离线重启可用。只想用本地规则就设 `"enabled": false`。
+
 ## 配置文件
 
 插件会按如下顺序寻找配置（命中第一个即使用）：

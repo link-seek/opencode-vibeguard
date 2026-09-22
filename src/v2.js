@@ -3,6 +3,7 @@ import { buildPatternSet } from "./patterns.js"
 import { PlaceholderSession } from "./session.js"
 import { redactText } from "./engine.js"
 import { redactDeep, restoreDeep } from "./deep.js"
+import { createSubscription } from "./subscription.js"
 
 /**
  * V2 setup (`Plugin.define({ id, setup })` 形态，`Plugin.define` 是透传，
@@ -31,7 +32,22 @@ export async function setupV2(ctx) {
 
   if (!config.enabled) return
 
-  const patterns = buildPatternSet(config.patterns)
+  // 规则订阅（V2）：本地规则 + 远端订阅合并，本地优先；拉失败 fail-closed。
+  // patternsRef.current 在刷新时原地替换，所有钩子实时生效。
+  const sub = config.subscription
+  const subscription = sub.enabled
+    ? createSubscription({
+        sub,
+        localPatterns: config.patterns,
+        buildPatternSet,
+        storage: ctx?.storage,
+        debug,
+        log: (...args) => console.log(...args),
+      })
+    : null
+  if (subscription) await subscription.start()
+  const patternsRef = subscription ? subscription.ref : { current: buildPatternSet(config.patterns) }
+  const live = () => patternsRef.current
   const sessions = new Map()
 
   const getSession = (sessionID) => {
@@ -50,7 +66,7 @@ export async function setupV2(ctx) {
 
   const redactString = (value, session) => {
     if (typeof value !== "string" || !value) return value
-    return redactText(value, patterns, session).text
+    return redactText(value, live(), session).text
   }
 
   // tool-result 的 result 是 { type, value } 联合体：text/error 的 string value 直接脱敏，
@@ -70,7 +86,7 @@ export async function setupV2(ctx) {
       result.value = redactString(value, session)
       return
     }
-    if (value && typeof value === "object") redactDeep(value, patterns, session)
+    if (value && typeof value === "object") redactDeep(value, live(), session)
   }
 
   // V2 Message.content: text | reasoning | tool-call | tool-result | compaction | effort | media
@@ -93,7 +109,7 @@ export async function setupV2(ctx) {
         }
         // part.encrypted 是 provider 签名，保持原样
       } else if (part.type === "tool-call" && part.input && typeof part.input === "object") {
-        redactDeep(part.input, patterns, session)
+        redactDeep(part.input, live(), session)
       } else if (part.type === "tool-result" && part.result && typeof part.result === "object") {
         redactResultValue(part.result, session)
       } else if (part.type === "compaction" && typeof part.text === "string") {
@@ -177,7 +193,7 @@ export async function setupV2(ctx) {
     session.cleanup()
     if (event.status === "completed" && event.result && typeof event.result === "object") {
       const { output, content, metadata } = event.result
-      if (output && typeof output === "object") redactDeep(output, patterns, session)
+      if (output && typeof output === "object") redactDeep(output, live(), session)
       else if (typeof output === "string") event.result.output = redactString(output, session)
       if (typeof content === "string") event.result.content = redactString(content, session)
       else if (Array.isArray(content)) {
@@ -187,16 +203,18 @@ export async function setupV2(ctx) {
           }
         }
       }
-      if (metadata && typeof metadata === "object") redactDeep(metadata, patterns, session)
+      if (metadata && typeof metadata === "object") redactDeep(metadata, live(), session)
     } else if (event.status === "error" && event.error) {
       if (typeof event.error.message === "string") {
         event.error.message = redactString(event.error.message, session)
       }
       if (event.error.metadata && typeof event.error.metadata === "object") {
-        redactDeep(event.error.metadata, patterns, session)
+        redactDeep(event.error.metadata, live(), session)
       }
     }
   })
 
   if (debug) console.log("[opencode-vibeguard] v2 hooks 已注册：prompt/context/compaction/generate/title + tool execute.before/after")
+
+  if (subscription) return () => subscription.stop()
 }

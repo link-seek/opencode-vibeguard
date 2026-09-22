@@ -2,6 +2,7 @@ import { existsSync } from "node:fs"
 import * as fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
+import { normalizeSubscription } from "./subscription.js"
 
 function parseDurationMs(input) {
   const raw = String(input ?? "").trim()
@@ -51,6 +52,7 @@ function normalizeConfig(raw) {
     ttlMs,
     maxMappings,
     patterns,
+    subscription: normalizeSubscription(cfg.subscription),
   }
 }
 

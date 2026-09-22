@@ -96,6 +96,27 @@ V2 hook mapping: `prompt` (redact at admission, DB stores placeholders) + `conte
 Note: unlike V1 there is no `text.complete` restore in V2 — persisted history keeps placeholders, which is safer.
 Local display shows placeholders; tool execution is unaffected.
 
+## Rules subscription (V2)
+
+Local `patterns` always apply. On top of that the plugin fetches a remote rule set, merges it
+(local wins on conflict), and refreshes on a timer — all fail-closed (fetch failure keeps existing rules).
+
+```jsonc
+// vibeguard.config.json
+{
+  "subscription": {
+    "enabled": true,
+    "url": "https://raw.githubusercontent.com/link-seek/opencode-vibeguard/main/rules.json",
+    "refresh": "24h",
+    "timeoutMs": 8000
+  }
+}
+```
+
+The hosted source of truth is `rules.json` in this repo. Fetched docs are validated
+(shape, max 1000 rules / 256KB, every regex must compile) and cached in plugin storage,
+so restarts work offline. Set `"enabled": false` to use local rules only.
+
 ## Configuration
 
 Config lookup order (first match wins):
