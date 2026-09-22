@@ -85,7 +85,7 @@ One package supports both runtimes: V1 calls `server(ctx)`, V2 calls `setup(ctx)
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["github:xieyucheng123/opencode-vibeguard"]
+  "plugins": ["github:link-seek/opencode-vibeguard"]
 }
 ```
 

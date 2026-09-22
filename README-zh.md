@@ -85,7 +85,7 @@ npm i -D opencode-vibeguard
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["github:xieyucheng123/opencode-vibeguard"]
+  "plugins": ["github:link-seek/opencode-vibeguard"]
 }
 ```
 

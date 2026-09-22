@@ -25,11 +25,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/inkdust2021/opencode-vibeguard.git"
+    "url": "git+https://github.com/link-seek/opencode-vibeguard.git"
   },
   "bugs": {
-    "url": "https://github.com/inkdust2021/opencode-vibeguard/issues"
+    "url": "https://github.com/link-seek/opencode-vibeguard/issues"
   },
-  "homepage": "https://github.com/inkdust2021/opencode-vibeguard#readme",
+  "homepage": "https://github.com/link-seek/opencode-vibeguard#readme",
   "license": "MIT"
 }
