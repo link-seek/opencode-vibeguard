@@ -3,8 +3,8 @@
   "version": "0.2.0",
   "description": "OpenCode 插件：发送给 LLM 前脱敏、工具执行前还原。单包双支持：V1 用 server()，V2 用 setup()（prompt/context/compaction/generate/title + tool execute.before/after）",
   "type": "module",
-  "main": "./src/index.js",
-  "exports": "./src/index.js",
+  "main": "./index.js",
+  "exports": "./index.js",
   "files": [
     "src",
     "README-zh.md",

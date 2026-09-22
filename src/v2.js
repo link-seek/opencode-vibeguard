@@ -75,40 +75,60 @@ export async function setupV2(ctx) {
 
   // V2 Message.content: text | reasoning | tool-call | tool-result | compaction | effort | media
   const redactContent = (content, session) => {
-    if (!Array.isArray(content)) return
+    if (!Array.isArray(content)) return 0
+    let changed = 0
     for (const part of content) {
       if (!part || typeof part !== "object") continue
       if (part.type === "text" && typeof part.text === "string") {
-        part.text = redactString(part.text, session)
+        const after = redactString(part.text, session)
+        if (after !== part.text) {
+          part.text = after
+          changed++
+        }
       } else if (part.type === "reasoning" && typeof part.text === "string") {
-        part.text = redactString(part.text, session)
+        const after = redactString(part.text, session)
+        if (after !== part.text) {
+          part.text = after
+          changed++
+        }
         // part.encrypted 是 provider 签名，保持原样
       } else if (part.type === "tool-call" && part.input && typeof part.input === "object") {
         redactDeep(part.input, patterns, session)
       } else if (part.type === "tool-result" && part.result && typeof part.result === "object") {
         redactResultValue(part.result, session)
       } else if (part.type === "compaction" && typeof part.text === "string") {
-        part.text = redactString(part.text, session)
+        const after = redactString(part.text, session)
+        if (after !== part.text) {
+          part.text = after
+          changed++
+        }
       }
     }
+    return changed
   }
 
   const redactRequest = (event) => {
     const session = getSession(event?.sessionID)
     if (!session) return
     session.cleanup()
+    let changed = 0
     if (Array.isArray(event.system)) {
       for (const part of event.system) {
         if (part && typeof part === "object" && typeof part.text === "string") {
-          part.text = redactString(part.text, session)
+          const after = redactString(part.text, session)
+          if (after !== part.text) {
+            part.text = after
+            changed++
+          }
         }
       }
     }
     if (Array.isArray(event.messages)) {
       for (const msg of event.messages) {
-        if (msg && typeof msg === "object") redactContent(msg.content, session)
+        if (msg && typeof msg === "object") changed += redactContent(msg.content, session)
       }
     }
+    if (debug && changed > 0) console.log(`[opencode-vibeguard] 出站请求脱敏：已修改 ${changed} 处文本片段`)
   }
 
   // prompt 在入库前脱敏：DB 里存占位符，provider 永远见不到真值。
@@ -131,6 +151,7 @@ export async function setupV2(ctx) {
         for (const s of event.prompt.skills ?? []) {
           if (s && typeof s === "object" && "mention" in s) s.mention = undefined
         }
+        if (debug) console.log("[opencode-vibeguard] prompt 入库前脱敏：已替换 1 处文本")
       }
     }
   })
