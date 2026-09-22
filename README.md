@@ -78,6 +78,24 @@ If you prefer to load from your local `node_modules`, use a `file://` plugin pat
 }
 ```
 
+## OpenCode V2 (0.2.0+)
+
+One package supports both runtimes: V1 calls `server(ctx)`, V2 calls `setup(ctx)` (no `@opencode/plugin` dependency needed).
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["github:xieyucheng123/opencode-vibeguard"]
+}
+```
+
+V2 hook mapping: `prompt` (redact at admission, DB stores placeholders) + `context`/`compaction`/`generate`/`title`
+(redact outbound `system`/`messages`, `reasoning.encrypted` passed through untouched) + `tool.execute.before`
+(restore placeholders so local tools get real values) + `tool.execute.after` (re-redact output before persistence).
+
+Note: unlike V1 there is no `text.complete` restore in V2 — persisted history keeps placeholders, which is safer.
+Local display shows placeholders; tool execution is unaffected.
+
 ## Configuration
 
 Config lookup order (first match wins):

@@ -78,6 +78,23 @@ npm i -D opencode-vibeguard
 }
 ```
 
+## OpenCode V2（0.2.0+）
+
+单包双支持：V1 调 `server(ctx)`，V2 调 `setup(ctx)`（无需依赖 `@opencode/plugin`）：
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["github:xieyucheng123/opencode-vibeguard"]
+}
+```
+
+V2 钩子映射：`prompt`（入库前脱敏，DB 存占位符）+ `context`/`compaction`/`generate`/`title`
+（出站 `system`/`messages` 脱敏，`reasoning.encrypted` 原样透传）+ `tool.execute.before`
+（还原占位符，本地工具拿真值执行）+ `tool.execute.after`（输出重新脱敏再入库）。
+
+注意：V2 没有 `text.complete` 还原，持久化历史保持占位符（更安全）。本地展示为占位符，不影响工具执行。
+
 ## 配置文件
 
 插件会按如下顺序寻找配置（命中第一个即使用）：

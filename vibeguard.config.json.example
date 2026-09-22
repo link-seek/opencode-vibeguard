@@ -13,7 +13,10 @@
     "regex": [
       { "pattern": "sk-[A-Za-z0-9]{48}", "category": "OPENAI_KEY" },
       { "pattern": "(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]+", "category": "GITHUB_TOKEN" },
-      { "pattern": "AKIA[0-9A-Z]{16}", "category": "AWS_ACCESS_KEY" }
+      { "pattern": "AKIA[0-9A-Z]{16}", "category": "AWS_ACCESS_KEY" },
+      { "pattern": "\\bcfut_[A-Za-z0-9_-]{30,}\\b", "category": "CLOUDFLARE_USER_TOKEN" },
+      { "pattern": "\\bcfat_[A-Za-z0-9_-]{30,}\\b", "category": "CLOUDFLARE_ACCOUNT_TOKEN" },
+      { "pattern": "\\bcfk_[A-Za-z0-9_-]{30,}\\b", "category": "CLOUDFLARE_GLOBAL_KEY" }
     ],
     "builtin": ["email", "china_phone", "china_id", "uuid", "ipv4", "mac"],
     "exclude": ["example.com", "localhost", "127.0.0.1", "0.0.0.0"]
