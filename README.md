@@ -117,6 +117,21 @@ The hosted source of truth is `rules.json` in this repo. Fetched docs are valida
 (shape, max 1000 rules / 256KB, every regex must compile) and cached in plugin storage,
 so restarts work offline. Set `"enabled": false` to use local rules only.
 
+Repeat requests use `ETag` / `If-Modified-Since` (304 = no change). Integrity is checked
+against `rules.json.sha256` published next to `rules.json` — a mismatch rejects the doc
+(fail-closed); a missing checksum file is accepted over TLS.
+
+Release a rules update:
+
+```bash
+# 1. edit rules.json, bump version + updated
+# 2. regenerate the checksum
+sha256sum rules.json | awk '{print $1"  rules.json"}' > rules.json.sha256
+# 3. verify
+npm test
+# 4. merge to main (optionally pin clients to a tag/commit raw URL first for canary)
+```
+
 ## Configuration
 
 Config lookup order (first match wins):

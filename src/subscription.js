@@ -74,26 +74,53 @@ function cleanPatterns(patterns) {
   return out
 }
 
-export async function fetchRulesDoc(url, timeoutMs, fetchImpl) {
+import { createHash } from "node:crypto"
+
+export async function fetchRulesDoc(url, timeoutMs, fetchImpl, conditional) {
   const fetchFn = fetchImpl ?? globalThis.fetch
   if (typeof fetchFn !== "function") throw new Error("fetch unavailable")
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), timeoutMs)
   try {
-    const res = await fetchFn(url, {
-      signal: ctrl.signal,
-      headers: { Accept: "application/json" },
-    })
+    const headers = { Accept: "application/json" }
+    if (conditional?.etag) headers["If-None-Match"] = conditional.etag
+    if (conditional?.lastModified) headers["If-Modified-Since"] = conditional.lastModified
+    const res = await fetchFn(url, { signal: ctrl.signal, headers })
+    if (res.status === 304) return { notModified: true }
     if (!res.ok) throw new Error(`rules subscription HTTP ${res.status}`)
     const text = await res.text()
     if (text.length > MAX_DOC_BYTES) throw new Error("rules doc too large")
+    await verifyChecksum(url, text, timeoutMs, fetchFn, ctrl.signal)
     const doc = JSON.parse(text)
     if (!isDocShape(doc)) throw new Error("rules doc shape invalid")
     if (countRules(doc.patterns) > MAX_REMOTE_RULES) throw new Error("rules doc too many rules")
-    return { version: doc.version, updated: doc.updated, patterns: cleanPatterns(doc.patterns) }
+    return {
+      version: doc.version,
+      updated: doc.updated,
+      patterns: cleanPatterns(doc.patterns),
+      etag: res.headers?.get?.("etag") ?? undefined,
+      lastModified: res.headers?.get?.("last-modified") ?? undefined,
+    }
   } finally {
     clearTimeout(timer)
   }
+}
+
+// 完整性校验：与 rules.json 同目录发布 rules.json.sha256（`sha256sum` 单行格式）。
+// 校验文件缺失（404）则放行（仅 TLS 保障），存在但不匹配则拒收。
+async function verifyChecksum(url, text, timeoutMs, fetchFn, signal) {
+  let res
+  try {
+    res = await fetchFn(`${url}.sha256`, { signal })
+  } catch {
+    return
+  }
+  if (res.status === 404) return
+  if (!res.ok) return
+  const line = (await res.text()).trim().split(/\s+/)[0] ?? ""
+  if (!/^[0-9a-fA-F]{64}$/.test(line)) throw new Error("checksum file malformed")
+  const actual = createHash("sha256").update(text, "utf8").digest("hex")
+  if (actual.toLowerCase() !== line.toLowerCase()) throw new Error("checksum mismatch")
 }
 
 // 合并：本地优先，去重键 kind:value|pattern；远端只补充本地没有的
@@ -133,22 +160,37 @@ export function createSubscription({ sub, localPatterns, buildPatternSet, storag
   const ref = { current: buildPatternSet(localPatterns) }
   let timer = null
   let stopped = false
+  let conditional = null
 
   const apply = (remotePatterns, source) => {
     ref.current = buildPatternSet(mergePatterns(localPatterns, remotePatterns))
     if (debug) log(`[opencode-vibeguard] 规则订阅已更新（${source}）`)
   }
 
+  const saveCache = async (entry) => {
+    if (!storage) return
+    await storage.set(CACHE_KEY, entry).catch(() => {})
+  }
+
   const refresh = async () => {
     if (stopped) return
     try {
-      const doc = await fetchRulesDoc(sub.url, sub.timeoutMs)
-      apply(doc.patterns, `远端 v${doc.version}`)
-      if (storage) {
-        await storage
-          .set(CACHE_KEY, { fetchedAt: Date.now(), url: sub.url, doc })
-          .catch(() => {})
+      const doc = await fetchRulesDoc(sub.url, sub.timeoutMs, undefined, conditional)
+      if (doc.notModified) {
+        if (storage) {
+          try {
+            const cached = await storage.get(CACHE_KEY)
+            if (cached) await saveCache({ ...cached, fetchedAt: Date.now() })
+          } catch {
+            // 忽略
+          }
+        }
+        if (debug) log("[opencode-vibeguard] 规则订阅无变化（304）")
+        return
       }
+      conditional = { etag: doc.etag, lastModified: doc.lastModified }
+      apply(doc.patterns, `远端 v${doc.version}`)
+      await saveCache({ fetchedAt: Date.now(), url: sub.url, doc, conditional })
     } catch (err) {
       if (debug) log(`[opencode-vibeguard] 规则订阅刷新失败，沿用现有规则：${err?.message ?? err}`)
     }
@@ -160,6 +202,7 @@ export function createSubscription({ sub, localPatterns, buildPatternSet, storag
         const cached = await storage.get(CACHE_KEY)
         if (cached && cached.url === sub.url && cached.doc && isDocShape(cached.doc)) {
           apply(cleanPatterns(cached.doc.patterns), "本地缓存")
+          if (cached.conditional) conditional = cached.conditional
         }
       } catch {
         // 忽略缓存读取失败

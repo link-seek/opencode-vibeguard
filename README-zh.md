@@ -113,6 +113,19 @@ V2 钩子映射：`prompt`（入库前脱敏，DB 存占位符）+ `context`/`co
 
 规则源就是本仓库的 `rules.json`。拉到的文档会校验（结构、最多 1000 条/256KB、每条正则必须可编译），并缓存在插件 storage 里，离线重启可用。只想用本地规则就设 `"enabled": false`。
 
+重复请求带 `ETag` / `If-Modified-Since`（304 表示无变化）。完整性用同目录的 `rules.json.sha256` 校验——不匹配拒收（fail-closed），缺失则放行（走 TLS）。
+
+发新规则：
+
+```bash
+# 1. 改 rules.json，version +1，updated 改当天
+# 2. 重新生成校验文件
+sha256sum rules.json | awk '{print $1"  rules.json"}' > rules.json.sha256
+# 3. 验证
+npm test
+# 4. 合 main（灰度可先让部分机器 pin 到 tag/commit 的 raw 地址）
+```
+
 ## 配置文件
 
 插件会按如下顺序寻找配置（命中第一个即使用）：

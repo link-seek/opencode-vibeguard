@@ -1,6 +1,7 @@
 import { describe, it, before, after } from "node:test"
 import assert from "node:assert/strict"
 import http from "node:http"
+import { createHash } from "node:crypto"
 import { buildPatternSet } from "../src/patterns.js"
 import { PlaceholderSession } from "../src/session.js"
 import { redactText } from "../src/engine.js"
@@ -64,6 +65,24 @@ before(
         routes.set("/slow.json", (_req, res) => {
           setTimeout(() => res.writeHead(200).end("{}"), 3000)
         })
+        const signedBody = JSON.stringify(remoteDoc())
+        const signedSum = createHash("sha256").update(signedBody, "utf8").digest("hex")
+        routes.set("/signed.json", (req, res) => {
+          if (req.headers["if-none-match"] === '"v1"') {
+            res.writeHead(304).end()
+            return
+          }
+          res.writeHead(200, { "Content-Type": "application/json", ETag: '"v1"' }).end(signedBody)
+        })
+        routes.set("/signed.json.sha256", (_req, res) => {
+          res.writeHead(200, { "Content-Type": "text/plain" }).end(`${signedSum}  rules.json\n`)
+        })
+        routes.set("/tampered.json", (_req, res) => {
+          res.writeHead(200, { "Content-Type": "application/json" }).end(signedBody)
+        })
+        routes.set("/tampered.json.sha256", (_req, res) => {
+          res.writeHead(200, { "Content-Type": "text/plain" }).end(`${"0".repeat(64)}  rules.json\n`)
+        })
         resolve()
       })
     }),
@@ -120,6 +139,15 @@ describe("rules subscription", () => {
 
   it("timeout aborts slow responses", async () => {
     await assert.rejects(fetchRulesDoc(`${base}/slow.json`, 200))
+  })
+
+  it("etag revalidation returns 304; checksum enforced when present", async () => {
+    const first = await fetchRulesDoc(`${base}/signed.json`, 5000)
+    assert.equal(first.version, 7)
+    assert.equal(first.etag, '"v1"')
+    const second = await fetchRulesDoc(`${base}/signed.json`, 5000, undefined, { etag: first.etag })
+    assert.equal(second.notModified, true)
+    await assert.rejects(fetchRulesDoc(`${base}/tampered.json`, 5000), /checksum mismatch/)
   })
 
   it("subscription start applies remote rules and caches; failure is fail-closed", async () => {
